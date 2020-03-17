@@ -1,3 +1,4 @@
+//boilerplate code copied from https://tutorials.botsfloor.com/building-a-node-js-slack-bot-before-your-microwave-popcorn-is-ready-8946651a5071
 require('dotenv').config();
 
 const express = require('express');
