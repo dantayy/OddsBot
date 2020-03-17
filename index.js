@@ -20,10 +20,11 @@ app.use(bodyParser.json());
 app.post('/', (req, res) => {
   var data = {form: {
     token: process.env.SLACK_AUTH_TOKEN,
-    channel: "#general",
+    channel: "#botspam",
     text: "Hi! :wave: \n I'm your new bot."
   }};
   request.post('https://slack.com/api/chat.postMessage', data, function (error, response, body) {
+    console.log("Error: " + error + ", Response: " + response + ", Body: " + body);
     // Sends welcome message
     res.json();
   });
