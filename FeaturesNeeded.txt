@@ -1,0 +1,8 @@
+- Odds challenger @'s the person they want to challenge with odds
+-- requires a username @'d and some text content detailing what the challenge is for (ex: "/odds @dummy you eat that raw egg")
+- the person who was @'d then needs to hit a return command setting the upper bounds of the odds 
+-- requires an integer >= 2 and some way of knowing that they were challenged in the first place (ex: to set a range of 1 to 100, the person who was just @'d by the /odds would then type "/setodds 100" because the minimum is always 1
+- both the initiator and the challenged enter values within that range
+-- requires knowledge of the upperbounds previously set by the challenged, who to listen to to capture their odds, and an int within the defined range (ex: both the initiator and the challenged would type "/commitodds [x]" where x is an int between 1 and 100 (inclusive bounds))
+- at any time the initiator or the challenged can cancel the challenge
+-- requires that the person typing command was involved in the challenge in the first place (ex: initiator or challenged types "/cancelodds" and all info on this odds challenge is wiped)
