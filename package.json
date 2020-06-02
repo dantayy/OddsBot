@@ -16,6 +16,7 @@
     "express-session": "^1.17.1",
     "ngrok": "^3.2.7",
     "redis": "^3.0.2",
+    "redis-cli": "^1.4.0",
     "request": "^2.88.2"
   }
 }
