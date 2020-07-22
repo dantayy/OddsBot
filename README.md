@@ -23,6 +23,7 @@ After all of that's on-hand, follow these steps to get a copy of the bot running
 
 ## Known Bugs
 * As of right now, people are only supposed to be able to have one active challenge tied to them at a time, but due to the way the app is structured, one person can be challenged by multiple people, which can only be resolved by the challenged person cancelling all of the challenges they're tied to one by one, or resolving them one by one.
+* For some reason the initiatorFlag never gets set to true when working with the db even when it should, something wonky with the for loop I think
 
 ## Related Media
 * [Details on slash commands](https://api.slack.com/interactivity/slash-commands#best_practices)
