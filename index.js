@@ -123,7 +123,7 @@ function slackSlashCommand(req, res) {
           userOdds = req.body.text.match(`[0-9]+`)[0];
           if (!userOdds || userOdds < 1 || userOdds > hashObj.upperLimit) { // bad case: no valid integer in text
             responseJSON = {
-              text: "You need enter a valid integer!"
+              text: "You need enter a valid integer!  It must be between 1 and " + hashObj.upperLimit
             };
           }
           else {
@@ -164,7 +164,6 @@ function slackSlashCommand(req, res) {
                 opponent = hashObj.initiatorID;
               }
               responseJSON = {
-                response_type: "in_channel",
                 text: "Odds entered successfully, waiting on <@" + opponent + ">",
               };
             }
