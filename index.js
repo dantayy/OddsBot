@@ -5,6 +5,7 @@ require(`dotenv`).config();
 const express = require(`express`); // significantly simplifies app routing
 const bodyParser = require(`body-parser`); // helps to parse request bodies
 const redis = require(`ioredis`); // allows us to set up a redis client locally
+const slack = require(`slack`); // allows on the fly slack interaction while handling the main payload
 
 // client that will connect to the redis db and handle interactions between slack and the db
 let redisClient = new redis({
@@ -12,6 +13,10 @@ let redisClient = new redis({
   host: process.env.REDIS_HOSTNAME,
   password: process.env.REDIS_PASSWORD,
 });
+
+// direct connection to the bot
+let token = process.env.SLACK_AUTH_TOKEN;
+let sBot = new slack({token});
 
 // Creates express app
 const app = express();
@@ -30,9 +35,7 @@ app.post('/', bodyParser.urlencoded({ extended: false }), slackSlashCommand);
 
 // Slack slash command handler
 function slackSlashCommand(req, res) {
-  let responseJSON = { // obj to be filled with data based on which case is met by the user's request and then sent back at the end
-    text: "Oopsie doopsie, something went wrong on my end!",
-  };
+  let responseJSON; // obj to be filled with data based on which case is met by the user's request and then sent back at the end
   redisHashGetAllHelper(req.body.user_id).then(hashObj => { // all commands need info on any challenge relating to this user, so grab that from the db first, then check all the cases
     console.log("Here's the returned hashObj from redisHashGetAllHelper: " + JSON.stringify(hashObj));
     // odds initiation
@@ -62,8 +65,13 @@ function slackSlashCommand(req, res) {
           redisClient.hset(initiatorChallengedHash, 'challengedOdds', 0, redis.print);
           responseJSON = {
             response_type: "in_channel",
-            text: "<@" + challengedID + ">, you've been challenged!  Submit your upper bounds now with /setodds or cancel the challenge with /cancelodds",
+            text: "<@" + req.body.user_id + "> has initiated an odds challenge against <@" + challengedID + ">",
           };
+          sBot.chat.postEphemeral({
+            channel: req.body.channel_id,
+            text: "<@" + challengedID + ">, you've been challenged!  Submit your upper bounds now with /setodds or cancel the challenge with /cancelodds",
+            user: challengedID,
+          });
         }
       }
     }
@@ -87,7 +95,10 @@ function slackSlashCommand(req, res) {
             };
           }
           else {
-            let uL = req.body.text.match(`[0-9]+`)[0];
+            let uL = null;
+            if(req.body.text.match(`[0-9]+`))
+              uL = req.body.text.match(`[0-9]+`)[0];
+            console.log("Upper limit readout: " + uL);
             if (!uL || uL <= 1 || uL >= Number.MAX_VALUE) { // bad case: no valid iteger in text
               responseJSON = {
                 text: "You need enter a valid integer!"
@@ -95,9 +106,13 @@ function slackSlashCommand(req, res) {
             } else {
               redisClient.hset(hashObj.hash, 'upperLimit', uL, redis.print);
               responseJSON = {
-                response_type: "in_channel",
-                text: "<@" + req.body.user_id + ">, Has set their upper limit to " + uL + ", now both they and the challenge initator must enter a value betweeen 1 and that number with /commitodds",
+                text: "Upper limit has been set to " + uL + ", now both of you must enter a value betweeen 1 and that number with /commitodds"
               };
+              sBot.chat.postEphemeral({
+                channel: req.body.channel_id,
+                text: "Upper limit has been set to " + uL + ", now both of you must enter a value betweeen 1 and that number with /commitodds",
+                user: hashObj.initiatorID,
+              });
             }
           }
         }
@@ -120,7 +135,9 @@ function slackSlashCommand(req, res) {
           };
         }
         else {
-          userOdds = req.body.text.match(`[0-9]+`)[0];
+          if(req.body.text.match(`[0-9]+`))
+            userOdds = req.body.text.match(`[0-9]+`)[0];
+          console.log("User odds: " + userOdds)
           if (!userOdds || userOdds < 1 || userOdds > hashObj.upperLimit) { // bad case: no valid integer in text
             responseJSON = {
               text: "You need enter a valid integer!  It must be between 1 and " + hashObj.upperLimit
@@ -152,9 +169,12 @@ function slackSlashCommand(req, res) {
             if (iOdds != 0 && cOdds != 0) { // both users in challenge have committed odds, respond with result
               redisClient.del(hashObj.hash);
               responseJSON = {
-                response_type: "in_channel",
-                text: "Both parties have submitted their odds!  <@" + hashObj.initiatorID + "> has entered " + iOdds + ", and <@" + hashObj.challengedID + "> has entered " + cOdds + ".  Do with that information what you will...",
+                text: "Odds entered successfully",
               };
+              sBot.chat.postMessage({
+                channel: req.body.channel_id,
+                text: "Both parties have submitted their odds!  <@" + hashObj.initiatorID + "> has entered " + iOdds + ", and <@" + hashObj.challengedID + "> has entered " + cOdds + ".  Do with that information what you will...",
+              });
             } else { // default response for successful submission of odds
               let opponent = ""; // change the opponent based on who committed this
               if (hashObj.isInitiator) {
@@ -178,18 +198,29 @@ function slackSlashCommand(req, res) {
           text: "You have no active challenge!"
         };
       }
-      else { 
+      else {
         redisClient.del(hashObj.hash);
         responseJSON = {
-          response_type: `in_channel`,
-          text: "<@" + req.body.user_id + "> has cancelled their challenge.",
+          text: "Challenge cancelled",
         };
+        let opponent = ""; // change the opponent based on who cancelled this
+        if (hashObj.isInitiator) {
+          opponent = hashObj.challengedID;
+        }
+        else {
+          opponent = hashObj.initiatorID;
+        }
+        sBot.chat.postEphemeral({
+          channel: req.body.channel_id,
+          text: "An odds challenge you were tied to has been cancelled",
+          user: opponent,
+        });
       }
     }
     // Default case of an unknown command, shouldn't be accessible
     else {
       responseJSON = {
-        text: "Bad command!  How did you get here?",
+        text: "Command not accounted for in the app",
       };
     }
   }).catch(err => { // errors from the promise are caught here
@@ -232,8 +263,10 @@ let redisHashGetAllHelper = async (id) => {
     for (let i = 0; i < 2; i++) {
       if (involvedParties[i] === id) { // match found, assign vars accordingly
         matchHash = hash;
-        if ((i = 0)) initiatorFlag = true;
-        else initiatorFlag = false;
+        if (i == 0)
+          initiatorFlag = true;
+        else
+          initiatorFlag = false;
         break;
       }
     }
