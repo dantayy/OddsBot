@@ -18,7 +18,7 @@ For this app to run locally on your machine, you'll need the following:
 After all of that's on-hand, follow these steps to get a copy of the bot running locally
 1. follow [this](https://tutorials.botsfloor.com/building-a-node-js-slack-bot-before-your-microwave-popcorn-is-ready-8946651a5071) guide for getting an ngrok local server up and attaching it to your version of the bot in your organization (note that every time you reboot ngrok it gives you a new address to forward it to that you'll have to update the slash commands with)
 2. npm install the dependencies
-3. run `node index.js` to start the application
+3. run `node index.js` or just `start` to start the application
 4. try it out in your slack organization!
 
 ## Known Bugs
