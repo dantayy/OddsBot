@@ -38,6 +38,12 @@ function slackSlashCommand(req, res) {
   let responseJSON; // obj to be filled with data based on which case is met by the user's request and then sent back at the end
   redisHashGetAllHelper(req.body.user_id).then(hashObj => { // all commands need info on any challenge relating to this user, so grab that from the db first, then check all the cases
     console.log("Here's the returned hashObj from redisHashGetAllHelper: " + JSON.stringify(hashObj));
+    // grab the opponent's id if there was a match found to easily send messages to them privately later if needed
+    let opponent = "";
+    if (hashObj.isInitiator)
+      opponent = hashObj.challengedID;
+    else
+      opponent = hashObj.initiatorID;
     // odds initiation
     if (req.body.command === '/odds') {
       if (!req.body.text.includes("<@")) { // bad case: no user specified
@@ -98,8 +104,8 @@ function slackSlashCommand(req, res) {
             let uL = null;
             if(req.body.text.match(`[0-9]+`))
               uL = req.body.text.match(`[0-9]+`)[0];
-            console.log("Upper limit readout: " + uL);
-            if (!uL || uL <= 1 || uL >= Number.MAX_VALUE) { // bad case: no valid iteger in text
+            //console.log("Upper limit readout: " + uL);
+            if (!uL || parseInt(uL, 10) <= 1 || parseInt(uL, 10) >= Number.MAX_VALUE) { // bad case: no valid iteger in text
               responseJSON = {
                 text: "You need enter a valid integer!"
               };
@@ -137,8 +143,8 @@ function slackSlashCommand(req, res) {
         else {
           if(req.body.text.match(`[0-9]+`))
             userOdds = req.body.text.match(`[0-9]+`)[0];
-          console.log("User odds: " + userOdds)
-          if (!userOdds || userOdds < 1 || userOdds > hashObj.upperLimit) { // bad case: no valid integer in text
+          //console.log("User odds: " + userOdds)
+          if (!userOdds || parseInt(userOdds, 10) < 1 || parseInt(userOdds, 10) > hashObj.upperLimit) { // bad case: no valid integer in text
             responseJSON = {
               text: "You need enter a valid integer!  It must be between 1 and " + hashObj.upperLimit
             };
@@ -176,16 +182,14 @@ function slackSlashCommand(req, res) {
                 text: "Both parties have submitted their odds!  <@" + hashObj.initiatorID + "> has entered " + iOdds + ", and <@" + hashObj.challengedID + "> has entered " + cOdds + ".  Do with that information what you will...",
               });
             } else { // default response for successful submission of odds
-              let opponent = ""; // change the opponent based on who committed this
-              if (hashObj.isInitiator) {
-                opponent = hashObj.challengedID;
-              }
-              else {
-                opponent = hashObj.initiatorID;
-              }
               responseJSON = {
                 text: "Odds entered successfully, waiting on <@" + opponent + ">",
               };
+              sBot.chat.postEphemeral({
+                channel: req.body.channel_id,
+                text: "Opponent has set their odds, waiting for you to submit yours now",
+                user: opponent,
+              });
             }
           }
         }
@@ -203,13 +207,6 @@ function slackSlashCommand(req, res) {
         responseJSON = {
           text: "Challenge cancelled",
         };
-        let opponent = ""; // change the opponent based on who cancelled this
-        if (hashObj.isInitiator) {
-          opponent = hashObj.challengedID;
-        }
-        else {
-          opponent = hashObj.initiatorID;
-        }
         sBot.chat.postEphemeral({
           channel: req.body.channel_id,
           text: "An odds challenge you were tied to has been cancelled",
@@ -240,12 +237,12 @@ const redisScanHelper = async () => {
   let hashes = []; // to be filled with hashes and sent back when all promises relating to this are fulfilled
   do {
     const scanReturn = await redisClient.scan(cursor); // wait for the scan's results before proceeding with this loop
-    console.log(JSON.stringify(scanReturn));
+    //console.log(JSON.stringify(scanReturn));
     cursor = scanReturn[0]; // scan returns a size 2 array, element 1 is the next cursor position
-    console.log('New cursor: ' + cursor);
+    //console.log('New cursor: ' + cursor);
     const newHashes = scanReturn[1]; // element 2 of scan array is a subarray of keys(in this case hashes) which we will update our local array with
     hashes = [...hashes, ...newHashes];
-    console.log('New list of hashes: ' + hashes);
+    //console.log('New list of hashes: ' + hashes);
   } while (cursor && cursor != 0); // when a scan returns a cursor of 0, it means it's finished scanning the db
   return Promise.all(hashes).catch((err) => { // only return when all async hash updates in the above loop have come back, and catch any errors
     console.log('error in redisScanHelper', err);
@@ -273,7 +270,7 @@ let redisHashGetAllHelper = async (id) => {
   });
   if (matchHash) {
     const hashInfo = await redisClient.hgetall(matchHash); // get all pertinent info from the db to fill in the hashObj
-    console.log(hashInfo);
+    //console.log(hashInfo);
     hashObj = {
       hash: matchHash,
       initiatorID: matchHash.split(`\|`)[0],
