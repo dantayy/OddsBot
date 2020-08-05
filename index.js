@@ -16,7 +16,7 @@ let redisClient = new redis({
 
 // direct connection to the bot
 let token = process.env.SLACK_AUTH_TOKEN;
-let sBot = new slack({token});
+let sBot = new slack({ token });
 
 // Creates express app
 const app = express();
@@ -40,10 +40,12 @@ function slackSlashCommand(req, res) {
     console.log("Here's the returned hashObj from redisHashGetAllHelper: " + JSON.stringify(hashObj));
     // grab the opponent's id if there was a match found to easily send messages to them privately later if needed
     let opponent = "";
-    if (hashObj.isInitiator)
-      opponent = hashObj.challengedID;
-    else
-      opponent = hashObj.initiatorID;
+    if (hashObj) {
+      if (hashObj.isInitiator)
+        opponent = hashObj.challengedID;
+      else
+        opponent = hashObj.initiatorID;
+    }
     // odds initiation
     if (req.body.command === '/odds') {
       if (!req.body.text.includes("<@")) { // bad case: no user specified
@@ -102,7 +104,7 @@ function slackSlashCommand(req, res) {
           }
           else {
             let uL = null;
-            if(req.body.text.match(`[0-9]+`))
+            if (req.body.text.match(`[0-9]+`))
               uL = req.body.text.match(`[0-9]+`)[0];
             //console.log("Upper limit readout: " + uL);
             if (!uL || parseInt(uL, 10) <= 1 || parseInt(uL, 10) >= Number.MAX_VALUE) { // bad case: no valid iteger in text
@@ -141,7 +143,7 @@ function slackSlashCommand(req, res) {
           };
         }
         else {
-          if(req.body.text.match(`[0-9]+`))
+          if (req.body.text.match(`[0-9]+`))
             userOdds = req.body.text.match(`[0-9]+`)[0];
           //console.log("User odds: " + userOdds)
           if (!userOdds || parseInt(userOdds, 10) < 1 || parseInt(userOdds, 10) > hashObj.upperLimit) { // bad case: no valid integer in text
